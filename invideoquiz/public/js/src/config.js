@@ -5,13 +5,13 @@ var InVideoQuizXBlock = InVideoQuizXBlock || {{}};
 (function () {{
     InVideoQuizXBlock.config = InVideoQuizXBlock.config || {{}};
 
-    var videoId = '{video_id}';
+    var videoId = {video_id};
     // This is (temporary) error handling for previous-submitted invalid timemap.
     try {{
         if (videoId) {{
             InVideoQuizXBlock.config[videoId] = {{
-                timemap: JSON.parse(`{timemap}`),
-                jumpBack: '{jump_back}'
+                timemap: JSON.parse({timemap}),
+                jumpBack: {jump_back}
             }};
         }}
     }}

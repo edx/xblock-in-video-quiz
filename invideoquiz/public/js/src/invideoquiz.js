@@ -10,8 +10,8 @@ function InVideoQuizXBlock(runtime, element) {
     var jumpBackValue = videoConfig.jumpBack || '';
     var studentMode = $('.in-video-quiz-block').data('mode') !== 'staff';
     var extraVideoButtons =
-        '<button class="in-video-continue">Continue</button>' +
-        '<button class="in-video-jump-back">' +
+        '<button type="button" class="in-video-continue">Continue</button>' +
+        '<button type="button" class="in-video-jump-back">' +
         '<svg width="14" height="16" viewBox="0 0 10 12" fill="none" ' +
         'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
         '<path d="M4.875 11.375C4.19792 11.375 3.56372 11.2464 2.9724 10.9891C2.38108 10.7318 1.86649 10.3842 1.42865 9.94635C0.990799 9.50851 0.643229 8.99392 0.385938 8.4026C0.128646 7.81128 0 7.17708 0 6.5H1.08333C1.08333 7.55625 1.45122 8.45226 2.18698 9.18802C2.92274 9.92379 3.81875 10.2917 4.875 10.2917C5.93125 10.2917 6.82726 9.92379 7.56302 9.18802C8.29879 8.45226 8.66667 7.55625 8.66667 6.5C8.66667 5.44375 8.29879 4.54774 7.56302 3.81198C6.82726 3.07622 5.93125 2.70833 4.875 2.70833H4.79375L5.63333 3.54792L4.875 4.33333L2.70833 2.16667L4.875 0L5.63333 0.785417L4.79375 1.625H4.875C5.55208 1.625 6.18628 1.75365 6.7776 2.01094C7.36892 2.26823 7.88351 2.6158 8.32135 3.05365C8.7592 3.49149 9.10677 4.00608 9.36406 4.5974C9.62135 5.18872 9.75 5.82292 9.75 6.5C9.75 7.17708 9.62135 7.81128 9.36406 8.4026C9.10677 8.99392 8.7592 9.50851 8.32135 9.94635C7.88351 10.3842 7.36892 10.7318 6.7776 10.9891C6.18628 11.2464 5.55208 11.375 4.875 11.375Z" fill="#2A2A2A"/>' +
@@ -295,7 +295,6 @@ function InVideoQuizXBlock(runtime, element) {
                 $('.in-video-jump-back', problemToDisplay).on('click', function() {
                     var jumpBackTarget = jumpBackConfig.map[currentProblemTime];
                     var jumpBackSeconds = parseTimeToSeconds(jumpBackTarget || jumpBackConfig.defaultValue);
-                    console.log('Jump back - currentProblemTime:', currentProblemTime, 'target:', jumpBackTarget, 'seconds:', jumpBackSeconds);
                     if (!isNaN(jumpBackSeconds)) {
                         $('.wrapper-downloads, .video-controls', video).show();
                         if (videoState.videoPlayer.player && videoState.videoPlayer.player.seekTo) {

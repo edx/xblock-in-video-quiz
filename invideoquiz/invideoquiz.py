@@ -71,7 +71,7 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
             'A simple string field to define problem IDs '
             'and their time maps (in MM:SS) as JSON. '
             'Example: {"00:10": "50srvqlii4ru9gonprp35gkcfyd5weju"} '
-            'Problem IDs can be obatined from staff debug info of '
+            'Problem IDs can be obtained from staff debug info of '
             'the problems in the LMS.'
         ),
         multiline_editor=True,
@@ -130,9 +130,9 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         )
         config = get_resource_string('js/src/config.js')
         config = config.format(
-            video_id=self.video_id,
-            timemap=self.timemap,
-            jump_back=self.jump_back,
+            video_id=json.dumps(self.video_id),
+            timemap=json.dumps(self.timemap),
+            jump_back=json.dumps(self.jump_back),
         )
         fragment.add_javascript(config)
         return fragment
