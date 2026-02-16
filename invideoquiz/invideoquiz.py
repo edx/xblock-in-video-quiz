@@ -69,17 +69,29 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         scope=Scope.settings,
         help=_(
             'A simple string field to define problem IDs '
-            'and their time maps (in seconds) as JSON. '
-            'Example: {"60": "50srvqlii4ru9gonprp35gkcfyd5weju"} '
-            'Problem IDs can be obatined from staff debug info of '
+            'and their time maps (in MM:SS) as JSON. '
+            'Example: {"00:10": "50srvqlii4ru9gonprp35gkcfyd5weju"} '
+            'Problem IDs can be obtained from staff debug info of '
             'the problems in the LMS.'
         ),
         multiline_editor=True,
     )
 
+    jump_back = String(
+        display_name=_('Jump Back Time'),
+        default='',
+        scope=Scope.settings,
+        help=_(
+            'Time to jump back to when the learner clicks the Jump Back '
+            'button (MM:SS).'
+        ),
+    )
+
     editable_fields = [
         'video_id',
         'timemap',
+        'jump_back',
+        'display_name',
     ]
 
     def validate_field_data(self, validation, data):
@@ -118,8 +130,9 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         )
         config = get_resource_string('js/src/config.js')
         config = config.format(
-            video_id=self.video_id,
-            timemap=self.timemap,
+            video_id=json.dumps(self.video_id),
+            timemap=json.dumps(self.timemap),
+            jump_back=json.dumps(self.jump_back),
         )
         fragment.add_javascript(config)
         return fragment
