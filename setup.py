@@ -104,7 +104,7 @@ VERSION = get_version("invideoquiz/__init__.py")
 
 
 setup(
-    name='invideoquiz-xblock',
+    name='edx-invideoquiz-xblock',
     version=VERSION,
     description='Helper XBlock to locate CAPA problems within videos.',
     long_description='Helper XBlock to locate CAPA problems within videos.',
