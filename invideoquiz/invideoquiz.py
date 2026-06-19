@@ -39,6 +39,46 @@ def get_resource_string(path):
     return resource_loader.load_unicode(path)
 
 
+def parse_timemap_field(raw_timemap):
+    """
+    Parse the timemap String field into a dict for LMS config injection.
+
+    Supports legacy single-problem values and multi-problem arrays:
+    {"1:30": "problemId1", "2:00": ["problemId2", "problemId3"]}
+    """
+    if not raw_timemap:
+        return {}
+    try:
+        parsed = json.loads(raw_timemap)
+    except (ValueError, TypeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def parse_jump_back_field(raw_jump_back):
+    """
+    Parse the jump_back String field for LMS config injection.
+
+    Supports:
+    - empty / unset
+    - legacy global MM:SS string (e.g. "1:29")
+    - legacy time-keyed JSON object (e.g. {"1:30": "1:29"})
+    - per-problem JSON object
+      (e.g. {"problemId1": "1:29", "problemId2": "1:45"})
+    """
+    if not raw_jump_back:
+        return {}
+    try:
+        parsed = json.loads(raw_jump_back)
+    except (ValueError, TypeError):
+        return raw_jump_back.strip()
+    if isinstance(parsed, dict):
+        return parsed
+    if isinstance(parsed, str):
+        return parsed
+    return {}
+
+
 class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
     """
     Display CAPA problems within a video component at a specified time.
@@ -68,9 +108,10 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         default='{}',
         scope=Scope.settings,
         help=_(
-            'A simple string field to define problem IDs '
-            'and their time maps (in MM:SS) as JSON. '
-            'Example: {"00:10": "50srvqlii4ru9gonprp35gkcfyd5weju"} '
+            'A JSON timemap of problem IDs keyed by timestamp (MM:SS). '
+            'Use a string for one problem or an array for multiple problems '
+            'at the same timestamp. Example: '
+            '{"1:30": ["problemId1", "problemId2"], "2:00": "problemId3"} '
             'Problem IDs can be obtained from staff debug info of '
             'the problems in the LMS.'
         ),
@@ -83,7 +124,12 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         scope=Scope.settings,
         help=_(
             'Time to jump back to when the learner clicks the Jump Back '
-            'button (MM:SS).'
+            'button (MM:SS). Provide a single MM:SS value to apply the same '
+            'jump-back time to every problem, or a JSON object keyed by '
+            'problem ID to give each problem its own value, e.g. '
+            '{"problemId1": "1:29", "problemId2": "1:35"}. '
+            'Legacy maps keyed by timestamp (e.g. {"1:30": "1:29"}) are '
+            'still supported.'
         ),
     )
 
@@ -131,8 +177,8 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         config = get_resource_string('js/src/config.js')
         config = config.format(
             video_id=json.dumps(self.video_id),
-            timemap=json.dumps(self.timemap),
-            jump_back=json.dumps(self.jump_back),
+            timemap=json.dumps(parse_timemap_field(self.timemap)),
+            jump_back=json.dumps(parse_jump_back_field(self.jump_back)),
         )
         fragment.add_javascript(config)
         return fragment

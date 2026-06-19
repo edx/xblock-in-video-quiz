@@ -114,6 +114,20 @@ function InVideoQuizXBlock(runtime, element) {
         };
     }
 
+    function normalizeProblemIds(componentId) {
+        if ($.isArray(componentId)) {
+            return componentId;
+        }
+        if (componentId) {
+            return [componentId];
+        }
+        return [];
+    }
+
+    function componentMatchesId(component, componentId) {
+        return component.data('id').indexOf(componentId) !== -1;
+    }
+
     function buildProblemTimesMap() {
         var normalized = {};
         $.each(problemTimesMap, function(time, componentId) {
@@ -125,19 +139,43 @@ function InVideoQuizXBlock(runtime, element) {
         return normalized;
     }
 
+    function looksLikeTimeKey(key) {
+        var text = (key || '').toString();
+        if (text.indexOf(':') !== -1) {
+            return true;
+        }
+        return /^\d{1,5}$/.test(text);
+    }
+
     function buildJumpBackTimesMap() {
         var parsed = parseJumpBackConfig(jumpBackValue);
-        var normalized = {};
-        $.each(parsed.map, function(time, jumpTo) {
-            var seconds = parseTimeToSeconds(time);
-            if (!isNaN(seconds)) {
-                normalized[seconds] = jumpTo;
+        var byTime = {};
+        var byId = {};
+        $.each(parsed.map, function(key, jumpTo) {
+            if (looksLikeTimeKey(key)) {
+                var seconds = parseTimeToSeconds(key);
+                if (!isNaN(seconds)) {
+                    byTime[seconds] = jumpTo;
+                }
+            } else {
+                byId[key] = jumpTo;
             }
         });
         return {
-            map: normalized,
+            byTime: byTime,
+            byId: byId,
             defaultValue: parsed.defaultValue
         };
+    }
+
+    function resolveJumpBackTarget(jumpBackConfig, problemId, problemTime) {
+        if (problemId && jumpBackConfig.byId[problemId] !== undefined) {
+            return jumpBackConfig.byId[problemId];
+        }
+        if (jumpBackConfig.byTime[problemTime] !== undefined) {
+            return jumpBackConfig.byTime[problemTime];
+        }
+        return jumpBackConfig.defaultValue;
     }
 
     function setUpStudentView(component) {
@@ -146,15 +184,17 @@ function InVideoQuizXBlock(runtime, element) {
             video = $('.video', component);
         } else {
             $.each(problemTimesMap, function(time, componentId) {
-                if (component.data('id').indexOf(componentId) !== -1) {
-                    component.addClass('in-video-problem-wrapper');
-                    var problemView = $('.xblock-student_view', component);
-                    // Only add buttons if they don't already exist
-                    if (problemView.find('.in-video-continue').length === 0) {
-                        problemView.append(extraVideoButtons);
+                normalizeProblemIds(componentId).forEach(function(id) {
+                    if (componentMatchesId(component, id)) {
+                        component.addClass('in-video-problem-wrapper');
+                        var problemView = $('.xblock-student_view', component);
+                        // Only add buttons if they don't already exist
+                        if (problemView.find('.in-video-continue').length === 0) {
+                            problemView.append(extraVideoButtons);
+                        }
+                        problemView.addClass('in-video-problem').hide();
                     }
-                    problemView.addClass('in-video-problem').hide();
-                }
+                });
             });
         }
     }
@@ -193,19 +233,23 @@ function InVideoQuizXBlock(runtime, element) {
 
     function showProblemTimesToInstructor(component) {
         $.each(problemTimesMap, function(time, componentId) {
-            var isInVideoComponent = component.data('id').indexOf(componentId) !== -1;
-            if (isInVideoComponent) {
-                var displayTime = time;
-                if (time.toString().indexOf(':') === -1) {
-                    displayTime = formatTimeFromSeconds(parseInt(time, 10));
+            normalizeProblemIds(componentId).forEach(function(id) {
+                if (componentMatchesId(component, id)) {
+                    var displayTime = time;
+                    if (time.toString().indexOf(':') === -1) {
+                        displayTime = formatTimeFromSeconds(parseInt(time, 10));
+                    }
+                    var timeParagraph = '<p class="in-video-alert"><i class="fa fa-exclamation-circle"></i>This component will appear in the video at <strong>' + displayTime + '</strong></p>';
+                    component.prepend(timeParagraph);
                 }
-                var timeParagraph = '<p class="in-video-alert"><i class="fa fa-exclamation-circle"></i>This component will appear in the video at <strong>' + displayTime + '</strong></p>';
-                component.prepend(timeParagraph);
-            }
+            });
         });
     }
 
     function resizeInVideoProblem(currentProblem, dimensions) {
+        if (!currentProblem || !currentProblem.css) {
+            return;
+        }
         var targetWidth = Math.round(dimensions.width * problemScale);
         var targetHeight = Math.round(dimensions.height * problemScale);
         var left = Math.round(dimensions.left + (dimensions.width - targetWidth) / 2);
@@ -221,6 +265,22 @@ function InVideoQuizXBlock(runtime, element) {
         });
     }
 
+    function seekVideoTo(seconds) {
+        if (!videoState || !videoState.videoPlayer) {
+            return;
+        }
+        var player = videoState.videoPlayer;
+        if (typeof player.seekTo === 'function') {
+            player.seekTo(seconds);
+            return;
+        }
+        if (player.player && typeof player.player.seekTo === 'function') {
+            player.player.seekTo(seconds, true);
+            return;
+        }
+        player.currentTime = seconds;
+    }
+
     // Bind In Video Quiz display to video time, as well as play and pause buttons
     function bindVideoEvents() {
         var canDisplayProblem = true;
@@ -228,8 +288,123 @@ function InVideoQuizXBlock(runtime, element) {
         var resizeIntervalObject;
         var problemToDisplay;
         var currentProblemTime;
+        var currentProblemId;
+        var problemQueue = [];
+        var queueIndex = 0;
         var normalizedProblemTimesMap = buildProblemTimesMap();
         var jumpBackConfig = buildJumpBackTimesMap();
+
+        function clearResizeInterval() {
+            if (resizeIntervalObject) {
+                clearInterval(resizeIntervalObject);
+                resizeIntervalObject = null;
+            }
+        }
+
+        function hideProblemToDisplay() {
+            clearResizeInterval();
+            if (problemToDisplay) {
+                problemToDisplay.hide();
+                problemToDisplay = null;
+            }
+        }
+
+        function showProblemById(problemId, videoTime) {
+            $('#seq_content .vert-mod .vert, #course-content .vert-mod .vert').each(function() {
+                if (componentMatchesId($(this), problemId)) {
+                    problemToDisplay = $('.xblock-student_view', this);
+                    videoState.videoPlayer.pause();
+                    resizeInVideoProblem(problemToDisplay, getDimensions());
+                    problemToDisplay.show();
+                    problemToDisplay.css({
+                        display: 'block'
+                    });
+                    canDisplayProblem = false;
+                    currentProblemTime = videoTime;
+                    currentProblemId = problemId;
+                }
+            });
+        }
+
+        function bindProblemControls() {
+            if (!problemToDisplay) {
+                return;
+            }
+
+            clearResizeInterval();
+            resizeIntervalObject = setInterval(function() {
+                var currentDimensions = getDimensions();
+                if (dimensionsHaveChanged(currentDimensions)) {
+                    resizeInVideoProblem(problemToDisplay, currentDimensions);
+                    knownDimensions = currentDimensions;
+                }
+            }, resizeIntervalTime);
+
+            var jumpBackTarget = resolveJumpBackTarget(jumpBackConfig, currentProblemId, currentProblemTime);
+            var hasJumpBack = jumpBackTarget || jumpBackConfig.defaultValue;
+            if (hasJumpBack) {
+                $('.in-video-jump-back', problemToDisplay).show();
+            } else {
+                $('.in-video-jump-back', problemToDisplay).hide();
+            }
+
+            $('.in-video-continue', problemToDisplay).off('click').on('click', function() {
+                var completedProblemId = currentProblemId;
+                var completedProblemTime = currentProblemTime;
+                hideProblemToDisplay();
+                queueIndex += 1;
+                if (queueIndex < problemQueue.length) {
+                    showProblemById(problemQueue[queueIndex], currentProblemTime);
+                    bindProblemControls();
+                    return;
+                }
+                var jumpBackTargetValue = resolveJumpBackTarget(
+                    jumpBackConfig, completedProblemId, completedProblemTime
+                );
+                var jumpBackSeconds = parseTimeToSeconds(
+                    jumpBackTargetValue || jumpBackConfig.defaultValue
+                );
+                problemQueue = [];
+                queueIndex = 0;
+                currentProblemTime = null;
+                currentProblemId = null;
+                canDisplayProblem = false;
+                window.setTimeout(function() {
+                    canDisplayProblem = true;
+                }, displayIntervalTimeout);
+                $('.wrapper-downloads, .video-controls', video).show();
+                if (!isNaN(jumpBackSeconds)) {
+                    seekVideoTo(jumpBackSeconds);
+                }
+                videoState.videoPlayer.play();
+            });
+            $('.in-video-jump-back', problemToDisplay).off('click').on('click', function() {
+                var jumpBackTargetValue = resolveJumpBackTarget(jumpBackConfig, currentProblemId, currentProblemTime);
+                var jumpBackSeconds = parseTimeToSeconds(jumpBackTargetValue || jumpBackConfig.defaultValue);
+                if (!isNaN(jumpBackSeconds)) {
+                    problemQueue = [];
+                    queueIndex = 0;
+                    hideProblemToDisplay();
+                    canDisplayProblem = true;
+                    currentProblemTime = null;
+                    currentProblemId = null;
+                    $('.wrapper-downloads, .video-controls', video).show();
+                    seekVideoTo(jumpBackSeconds);
+                    videoState.videoPlayer.play();
+                }
+            });
+        }
+
+        function showNextQueuedProblem(videoTime) {
+            if (queueIndex >= problemQueue.length) {
+                problemQueue = [];
+                queueIndex = 0;
+                canDisplayProblem = true;
+                return;
+            }
+            $('.wrapper-downloads, .video-controls', video).hide();
+            showProblemById(problemQueue[queueIndex], videoTime);
+        }
 
         video.on('play', function() {
             videoState = videoState || video.data('video-player-state');
@@ -240,30 +415,20 @@ function InVideoQuizXBlock(runtime, element) {
                 window.setTimeout(function() {
                     canDisplayProblem = true;
                 }, displayIntervalTimeout);
-                problemToDisplay.hide();
-                problemToDisplay = null;
+                hideProblemToDisplay();
                 currentProblemTime = null;
+                currentProblemId = null;
+                problemQueue = [];
+                queueIndex = 0;
             }
 
             intervalObject = setInterval(function() {
                 var videoTime = parseInt(videoState.videoPlayer.currentTime, 10);
-                var problemToDisplayId = normalizedProblemTimesMap[videoTime];
-                if (problemToDisplayId && canDisplayProblem) {
-                    $('.wrapper-downloads, .video-controls', video).hide();
-                    $('#seq_content .vert-mod .vert, #course-content .vert-mod .vert').each(function() {
-                        var isProblemToDisplay = $(this).data('id').indexOf(problemToDisplayId) !== -1;
-                        if (isProblemToDisplay) {
-                            problemToDisplay = $('.xblock-student_view', this)
-                            videoState.videoPlayer.pause();
-                            resizeInVideoProblem(problemToDisplay, getDimensions());
-                            problemToDisplay.show();
-                            problemToDisplay.css({
-                                display: 'block'
-                            });
-                            canDisplayProblem = false;
-                            currentProblemTime = videoTime;
-                        }
-                    });
+                var problemValue = normalizedProblemTimesMap[videoTime];
+                if (problemValue && canDisplayProblem) {
+                    problemQueue = normalizeProblemIds(problemValue);
+                    queueIndex = 0;
+                    showNextQueuedProblem(videoTime);
                 }
             }, displayIntervalTime);
         });
@@ -272,39 +437,7 @@ function InVideoQuizXBlock(runtime, element) {
             videoState = videoState || video.data('video-player-state');
             clearInterval(intervalObject);
             if (problemToDisplay) {
-                resizeIntervalObject = setInterval(function() {
-                    var currentDimensions = getDimensions();
-                    if (dimensionsHaveChanged(currentDimensions)) {
-                        resizeInVideoProblem(problemToDisplay, currentDimensions);
-                        knownDimensions = currentDimensions;
-                    }
-                }, resizeIntervalTime);
-
-                var jumpBackTarget = jumpBackConfig.map[currentProblemTime];
-                var hasJumpBack = jumpBackTarget || jumpBackConfig.defaultValue;
-                if (hasJumpBack) {
-                    $('.in-video-jump-back', problemToDisplay).show();
-                } else {
-                    $('.in-video-jump-back', problemToDisplay).hide();
-                }
-
-                $('.in-video-continue', problemToDisplay).on('click', function() {
-                    $('.wrapper-downloads, .video-controls', video).show();
-                    videoState.videoPlayer.play();
-                });
-                $('.in-video-jump-back', problemToDisplay).on('click', function() {
-                    var jumpBackTarget = jumpBackConfig.map[currentProblemTime];
-                    var jumpBackSeconds = parseTimeToSeconds(jumpBackTarget || jumpBackConfig.defaultValue);
-                    if (!isNaN(jumpBackSeconds)) {
-                        $('.wrapper-downloads, .video-controls', video).show();
-                        if (videoState.videoPlayer.player && videoState.videoPlayer.player.seekTo) {
-                            videoState.videoPlayer.player.seekTo(jumpBackSeconds);
-                        } else {
-                            videoState.videoPlayer.currentTime = jumpBackSeconds;
-                        }
-                        videoState.videoPlayer.play();
-                    }
-                });
+                bindProblemControls();
             }
         });
     }
