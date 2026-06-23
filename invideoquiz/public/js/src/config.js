@@ -10,7 +10,7 @@ var InVideoQuizXBlock = InVideoQuizXBlock || {{}};
     try {{
         if (videoId) {{
             InVideoQuizXBlock.config[videoId] = {{
-                timemap: JSON.parse({timemap}),
+                timemap: {timemap},
                 jumpBack: {jump_back}
             }};
         }}
