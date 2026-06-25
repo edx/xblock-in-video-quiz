@@ -37,19 +37,25 @@ function InVideoQuizXBlock(runtime, element) {
     var displayIntervalTimeout = 1500;
 
     $(function() {
-        $('#seq_content .vert-mod .vert, #course-content .vert-mod .vert').each(function() {
-            var component = $(this);
+        try {
+            $('#seq_content .vert-mod .vert, #course-content .vert-mod .vert').each(function() {
+                var component = $(this);
+
+                if (studentMode) {
+                    setUpStudentView(component);
+                } else {
+                    showProblemTimesToInstructor(component);
+                }
+            });
 
             if (studentMode) {
-                setUpStudentView(component);
-            } else {
-                showProblemTimesToInstructor(component);
+                knownDimensions = getDimensions();
+                bindVideoEvents();
             }
-        });
-
-        if (studentMode) {
-            knownDimensions = getDimensions();
-            bindVideoEvents();
+        } catch (err) {
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('InVideoQuizXBlock initialization error', err);
+            }
         }
     });
 
@@ -125,7 +131,8 @@ function InVideoQuizXBlock(runtime, element) {
     }
 
     function componentMatchesId(component, componentId) {
-        return component.data('id').indexOf(componentId) !== -1;
+        var componentDataId = component.data('id');
+        return !!(componentDataId && componentId && componentDataId.indexOf(componentId) !== -1);
     }
 
     function buildProblemTimesMap() {
@@ -316,9 +323,6 @@ function InVideoQuizXBlock(runtime, element) {
                     videoState.videoPlayer.pause();
                     resizeInVideoProblem(problemToDisplay, getDimensions());
                     problemToDisplay.show();
-                    problemToDisplay.css({
-                        display: 'block'
-                    });
                     canDisplayProblem = false;
                     currentProblemTime = videoTime;
                     currentProblemId = problemId;

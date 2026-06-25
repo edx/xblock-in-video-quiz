@@ -72,3 +72,29 @@
 .in-video-jump-back svg {
   flex-shrink: 0;
 }
+
+/* Studio author preview */
+.in-video-quiz-studio-author {
+    margin: 0;
+    background: #fff;
+    color: #393939;
+}
+
+.in-video-quiz-studio-author .in-video-quiz-studio-schedule {
+    margin: 0 0 0.75rem 1.25rem;
+    padding: 0;
+    list-style: disc;
+}
+
+.in-video-quiz-studio-author .in-video-quiz-studio-schedule li {
+    margin-bottom: 0.25rem;
+}
+
+.in-video-quiz-studio-author .in-video-quiz-time {
+    font-weight: 600;
+}
+
+.in-video-quiz-studio-author .in-video-quiz-studio-hint {
+    margin-bottom: 0;
+    color: #5c6770;
+}
