@@ -281,6 +281,8 @@ class TestAuthorView:
             return_value=store)  # pylint: disable=protected-access
         block._get_draft_usage_key = Mock(
             return_value=invideoquiz_key)  # pylint: disable=protected-access
+        block._build_sibling_usage_key = Mock(
+            return_value='problem-loc')  # pylint: disable=protected-access
 
         fragment = block.author_view()
 

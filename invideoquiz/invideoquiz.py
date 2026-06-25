@@ -530,11 +530,13 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         parts = ['<div class="in-video-quiz-studio-author">']
 
         if not video_label and not quiz_entries:
+            no_config_msg = _(
+                'No in-video quiz configured yet. Click Edit to select '
+                'a video and add questions.'
+            )
             parts.append(
                 '<p>'
-                f'{escape(_("No in-video quiz configured yet. "
-                            "Click Edit to select a video and add "
-                            "questions."))}'
+                f'{escape(no_config_msg)}'
                 '</p>'
             )
         else:
