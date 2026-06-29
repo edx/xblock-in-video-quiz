@@ -392,8 +392,26 @@ function InVideoQuizXBlock(runtime, element) {
 
     function ensureFullscreenSubtitlesVisible() {
         if (isVideoFullscreen()) {
-            $('.subtitles, .transcript', video).show();
+            restoreSubtitlesLayout();
         }
+    }
+
+    function restoreSubtitlesLayout() {
+        $('.subtitles', video).css({ display: '', visibility: '' });
+    }
+
+    function restoreVideoLayout() {
+        if (!video || !video.length) {
+            return;
+        }
+        video.removeClass('in-video-quiz-active');
+        $('.tc-wrapper .video-wrapper', video).css('visibility', '');
+        restoreSubtitlesLayout();
+        videoState = video.data('video-player-state') || videoState;
+        if (videoState && videoState.resizer && videoState.resizer.align) {
+            videoState.resizer.align();
+        }
+        video.trigger('caption:resize');
     }
 
     function applyProblemOverlayLayout(currentProblem) {
@@ -425,11 +443,7 @@ function InVideoQuizXBlock(runtime, element) {
     }
 
     function getHiddenVideoChromeSelector() {
-        var selectors = '.wrapper-downloads, .video-controls, .closed-captions';
-        if (!isVideoFullscreen()) {
-            selectors += ', .subtitles, .transcript';
-        }
-        return selectors;
+        return '.wrapper-downloads, .video-controls, .closed-captions';
     }
 
     function hideVideoChrome() {
@@ -442,12 +456,13 @@ function InVideoQuizXBlock(runtime, element) {
     }
 
     function showVideo() {
-        $('.wrapper-downloads, .video-controls, .closed-captions, .subtitles, .transcript', video).show();
+        $('.wrapper-downloads, .video-controls, .closed-captions', video).show();
         var $wrapper = $('.tc-wrapper', video);
         if ($wrapper.length && $wrapper.data('invideoquiz-overflow') !== undefined) {
             $wrapper.css('overflow', $wrapper.data('invideoquiz-overflow'));
             $wrapper.removeData('invideoquiz-overflow');
         }
+        restoreVideoLayout();
     }
 
     function seekVideoTo(seconds) {
@@ -491,12 +506,16 @@ function InVideoQuizXBlock(runtime, element) {
             $('#seq_content .in-video-problem, #course-content .in-video-problem').hide();
         }
 
-        function hideProblemToDisplay() {
+        function hideProblemToDisplay(options) {
+            options = options || {};
             clearResizeInterval();
             if (problemToDisplay) {
                 unmountProblemFromVideo(problemToDisplay);
                 problemToDisplay.hide();
                 problemToDisplay = null;
+            }
+            if (options.restoreVideo) {
+                showVideo();
             }
         }
 
@@ -588,7 +607,6 @@ function InVideoQuizXBlock(runtime, element) {
                 window.setTimeout(function() {
                     canDisplayProblem = true;
                 }, displayIntervalTimeout);
-                $('.wrapper-downloads, .video-controls', video).show();
                 showVideo();
                 videoState.videoPlayer.play();
             });
@@ -598,11 +616,10 @@ function InVideoQuizXBlock(runtime, element) {
                 if (!isNaN(jumpBackSeconds)) {
                     problemQueue = [];
                     queueIndex = 0;
-                    hideProblemToDisplay();
+                    hideProblemToDisplay({ restoreVideo: true });
                     canDisplayProblem = true;
                     currentProblemTime = null;
                     currentProblemId = null;
-                    showVideo();
                     seekVideoTo(jumpBackSeconds);
                     videoState.videoPlayer.play();
                 }
@@ -637,7 +654,7 @@ function InVideoQuizXBlock(runtime, element) {
                 window.setTimeout(function() {
                     canDisplayProblem = true;
                 }, displayIntervalTimeout);
-                hideProblemToDisplay();
+                hideProblemToDisplay({ restoreVideo: true });
                 currentProblemTime = null;
                 currentProblemId = null;
                 problemQueue = [];
