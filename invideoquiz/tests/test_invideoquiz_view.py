@@ -1,7 +1,7 @@
 """Tests for InVideoQuizXBlock views and field parsing."""
 
 import json
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 
 from invideoquiz.invideoquiz import (
     InVideoQuizXBlock,
@@ -245,8 +245,6 @@ class TestAuthorView:
     def test_author_view_resolves_siblings_via_direct_usage_key_lookup(self):
         """Resolve problem titles via direct modulestore lookup when sibling
         map fails."""
-        from unittest.mock import MagicMock
-
         invideoquiz_key = MagicMock()
         invideoquiz_key.branch = None
         invideoquiz_key.__str__ = Mock(

@@ -2,7 +2,6 @@
 This XBlock allows for edX components to be displayed to users inside of
 videos at specific time points.
 """
-# pylint: disable=import-outside-toplevel,import-error
 
 import json
 import os
@@ -20,12 +19,27 @@ except ImportError:
     from xblock.fragment import Fragment
 
 try:
+    from opaque_keys.edx.keys import UsageKey
+except ImportError:
+    UsageKey = None
+
+try:
     from xblock.utils.studio_editable import StudioEditableXBlockMixin
     from xblock.utils.resources import ResourceLoader
 except ModuleNotFoundError:
     # For backward compatibility with releases older than Quince.
     from xblockutils.studio_editable import StudioEditableXBlockMixin
     from xblockutils.resources import ResourceLoader
+
+try:
+    from xmodule.modulestore import ModuleStoreEnum
+except ImportError:
+    ModuleStoreEnum = None
+
+try:
+    from xmodule.modulestore.django import modulestore
+except ImportError:
+    modulestore = None
 
 
 from .utils import _
@@ -242,9 +256,8 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         usage_key = self._get_usage_key()
         if usage_key is None:
             return None
-        if hasattr(usage_key, 'for_branch'):
+        if ModuleStoreEnum is not None and hasattr(usage_key, 'for_branch'):
             try:
-                from xmodule.modulestore import ModuleStoreEnum
                 return usage_key.for_branch(ModuleStoreEnum.BranchName.draft)
             except (AttributeError, TypeError, ValueError,
                     ModuleNotFoundError):
@@ -259,11 +272,9 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
             return self.runtime.service(self, 'modulestore')
         except Exception:  # pylint: disable=broad-except
             pass
-        try:
-            from xmodule.modulestore.django import modulestore
+        if modulestore is not None:
             return modulestore()
-        except ImportError:
-            return None
+        return None
 
     @staticmethod
     def _get_child_display_name(child):
@@ -345,12 +356,11 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
         Build a sibling usage key from this block's course key and a block ID.
         """
         own_usage = str(usage_key)
-        if '+type@' not in own_usage:
+        if UsageKey is None or '+type@' not in own_usage:
             return None
         course_prefix = own_usage.split('+type@', 1)[0]
         candidate = f'{course_prefix}+type@{block_type}+block@{component_id}'
         try:
-            from opaque_keys.edx.keys import UsageKey
             sibling_key = UsageKey.from_string(candidate)
             if (hasattr(sibling_key, 'for_branch')
                     and hasattr(usage_key, 'branch')
@@ -358,10 +368,10 @@ class InVideoQuizXBlock(StudioEditableXBlockMixin, XBlock):
                 return sibling_key.for_branch(usage_key.branch)
             if hasattr(sibling_key, 'for_branch'):
                 try:
-                    from xmodule.modulestore import ModuleStoreEnum
-                    return sibling_key.for_branch(
-                        ModuleStoreEnum.BranchName.draft)
-                except ModuleNotFoundError:
+                    if ModuleStoreEnum is not None:
+                        return sibling_key.for_branch(
+                            ModuleStoreEnum.BranchName.draft)
+                except (AttributeError, TypeError, ValueError):
                     pass
             return sibling_key
         except Exception:  # pylint: disable=broad-except

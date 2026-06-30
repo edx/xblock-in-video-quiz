@@ -1,4 +1,3 @@
-# pylint: disable=django-not-configured
 """
 Runtime will load the XBlock class from here.
 """
