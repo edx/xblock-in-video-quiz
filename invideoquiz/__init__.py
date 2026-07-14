@@ -3,4 +3,4 @@ Runtime will load the XBlock class from here.
 """
 from .invideoquiz import InVideoQuizXBlock
 
-__version__ = '1.8.2'
+__version__ = '1.8.3'
