@@ -456,7 +456,7 @@ function InVideoQuizXBlock(runtime, element) {
     }
 
     function showVideo() {
-        $('.wrapper-downloads, .closed-captions', video).show();
+        $(getHiddenVideoChromeSelector(), video).show();
         var $wrapper = $('.tc-wrapper', video);
         if ($wrapper.length && $wrapper.data('invideoquiz-overflow') !== undefined) {
             $wrapper.css('overflow', $wrapper.data('invideoquiz-overflow'));
